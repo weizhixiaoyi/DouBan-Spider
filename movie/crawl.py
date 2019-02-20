@@ -3,8 +3,10 @@ import logging
 import logging.config
 import yaml
 import json
-import math
 import redis
+from multiprocessing.dummy import Pool as ThreadPool
+import threading
+import math
 import time
 import random
 import os
@@ -73,6 +75,15 @@ class DouBanMovieSpider:
         except Exception as err:
             self.movie_spider_log.error('UA初始化失败' + str(err))
 
+        # 初始化文件
+        try:
+            movie_info_file_path = '../data/movie_info.txt'
+            if os.path.exists(movie_info_file_path):
+                os.remove(movie_info_file_path)
+            self.movie_spider_log.info('文件初始化成功')
+        except Exception as err:
+            self.movie_spider_log.info('文件初始化失败' + str(err))
+
         # ip代理
         self.proxies = {"http": "http://10.10.1.10:3128"}
         # 最大待爬取列表数量
@@ -83,19 +94,77 @@ class DouBanMovieSpider:
         self.timeout = self.config['timeout']
 
         self.movie_spider_log.info('DouBan-Movie-Spider初始化成功')
-    
-    def _get_all_movie_id(self):
-        # 多线程
-        api = 'https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags=&start=0'
-        pass
 
+    def _get_movie_id(self, start=0):
+        """
+        根据api获取电影ID
+        :param start:
+        :return:
+        """
+        self.movie_spider_log.info('尝试获取' + str(start) + '页电影ID')
+        # 获取电影ID
+        try:
+            movie_id_api = 'https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags=电影&start=' + str(
+                start)
+            movie_id_text = requests.get(movie_id_api, headers=self.headers, proxies=self.proxies, timeout=self.timeout)
+            movie_id_json = json.loads(movie_id_text)
+            movie_id_data = movie_id_json['data']
+            if len(movie_id_data) == 0:
+                self.movie_spider_log.info('获取' + str(start) + '页电影ID成功, 长度为0')
+                return None
+            else:
+                movie_id_list = []
+                for movie in movie_id_data:
+                    movie_id_list.append(movie['id'])
+                self.movie_spider_log.info('获取' + str(start) + '页电影ID成功, 长度为' + str(len(movie_id_list)))
+                return movie_id_list
+        except Exception as err:
+            self.movie_spider_log.info('获取' + str(start) + '页电影ID失败' + str(err))
+
+    def _get_movie_info(self, movie_id):
+        """
+        获取当前电影信息
+        :param movie_id:
+        :return:
+        """
+        self.movie_spider_log.info('尝试获取' + str(movie_id) + '电影信息')
+        movie_info_url = 'https://movie.douban.com/subject/' + str(movie_id)
+        try:
+            movie_info_html = requests.get(movie_info_url, headers=self.headers, proxies=self.proxies,
+                                           timeout=self.timeout)
+
+            movie_info = {}
+
+            # 写入到文件之中
+            movie_info_file_path = 'movie_info.txt'
+            with open(movie_info_file_path, 'a+') as f:
+                movie_info_str = json.loads(movie_info)
+                f.write(json.dumps(movie_info_str))
+        except Exception as err:
+            self.movie_spider_log.info('获取' + str(movie_id) + '电影信息失败' + str(err))
+
+    def _get_all_movie_info(self):
+        is_end = False
+        start = 0
+        while not is_end:
+            # 获取电影ID
+            movie_id_list = self._get_movie_id(start)
+            if movie_id_list is None:
+                break
+
+            # 多线程获取电影Info
+            pool = ThreadPool(8)
+            pool.map(self._get_movie_info, movie_id_list)
+            pool.close()
+            pool.join()
 
     def run(self):
-        # 获取电影, 电视剧, 综艺, 动漫, 纪录片, 短片ID
-        self._get_all_movie_id()
-
-        # 获取电影, 电视剧, 综艺, 动漫, 纪录片, 短片信息
-        pass
+        """
+        获取电影信息和电影演员信息
+        :return:
+        """
+        # 获取电影信息
+        self._get_all_movie_info()
 
 
 if __name__ == '__main__':
