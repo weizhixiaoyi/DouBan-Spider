@@ -5,6 +5,7 @@ import yaml
 import json
 import redis
 from multiprocessing.dummy import Pool as ThreadPool
+from lxml import etree
 import threading
 import math
 import time
@@ -121,27 +122,149 @@ class DouBanMovieSpider:
         except Exception as err:
             self.movie_spider_log.info('获取' + str(start) + '页电影ID失败' + str(err))
 
+    def _save_movie_info(self, movie_info_json):
+        """
+        保存电影信息到文件之中
+        :param movie_info_json:
+        :return:
+        """
+        movie_info_str = json.dumps(movie_info_json, ensure_ascii=False)
+        movie_info_file_path = '../data/movie_info.txt'
+        try:
+            with open(movie_info_file_path, 'a+') as f:
+                f.write(movie_info_str)
+            self.movie_spider_log.info('写入电影' + str(movie_info_json['id']) + '到文件成功')
+        except Exception as err:
+            self.movie_spider_log.error('写入电影' + str(movie_info_json['id']) + '到文件失败' + str(err))
+
+    def _add_wait_actor(self, movie_id_json):
+        """
+        加入待抓取演员队列
+        :param user_token:
+        :return:
+        """
+        try:
+            actor_id_set = set()
+            directors = movie_id_json['directors']
+            writers = movie_id_json['writers']
+            casts = movie_id_json['casts']
+            for i in range(0, len(directors)):
+                actor_id_set.add(directors[i]['href'].split('/')[2])
+            for i in range(0, len(writers)):
+                actor_id_set.add(writers[i]['href'].split('/')[2])
+            for i in range(0, len(casts)):
+                actor_id_set.add(writers[i]['href'].split('/')[2])
+            for actor_id in actor_id_set:
+                if not self.redis_con.hexists('already_get_actor', actor_id):
+                    self.redis_con.hset('already_get_actor', actor_id, 1)
+                    self.redis_con.lpush('actor_queue', actor_id)
+                    self.movie_spider_log.info('添加演员' + str(actor_id) + '到待爬取队列成功')
+        except Exception as err:
+            self.movie_spider_log.error('添加演员到待爬取队列失败' + str(err))
+
     def _get_movie_info(self, movie_id):
         """
         获取当前电影信息
         :param movie_id:
         :return:
         """
-        self.movie_spider_log.info('尝试获取' + str(movie_id) + '电影信息')
+        self.movie_spider_log.info('尝试获取' + str(movie_id) + '电影信息...')
         movie_info_url = 'https://movie.douban.com/subject/' + str(movie_id)
         try:
             movie_info_html = requests.get(movie_info_url, headers=self.headers, proxies=self.proxies,
                                            timeout=self.timeout)
+            movie_tree = etree.HTML(movie_info_html)
 
-            movie_info = {}
+            # 解析电影页面获取电影信息
+            # 电影名称
+            name = movie_tree.xpath('//*[@id="content"]/h1/span[1]')[0].text
+            # 导演信息
+            directors = []
+            directors_name = [directors.text for directors in movie_tree.xpath('//*[@id="info"]/span[1]/span[2]/a')]
+            director_href = [director for director in movie_tree.xpath('//*[@id="info"]/span[1]/span[2]/a/@href')]
+            for i in range(0, len(directors_name)):
+                directors.append({'name': directors_name[i], 'href': director_href[i]})
+            # 编剧信息
+            writers = []
+            writers_name = [writers.text for writers in movie_tree.xpath('//*[@id="info"]/span[2]/span[2]/a')]
+            writers_href = [writers for writers in movie_tree.xpath('//*[@id="info"]/span[2]/span[2]/a/@href')]
+            for i in range(0, len(writers_name)):
+                writers.append({'name': writers_name[i], 'href': writers_href[i]})
+            # 主演信息
+            casts = []
+            casts_name = [casts.text for casts in movie_tree.xpath('//*[@id="info"]/span[3]/span[2]/a')]
+            casts_href = [casts for casts in movie_tree.xpath('//*[@id="info"]/span[3]/span[2]/a/@href')]
+            for i in range(0, len(casts_name)):
+                casts.append({'name': casts_name[i], 'href': casts_href[i]})
+            # 电影类型
+            genres = [genres.text for genres in movie_tree.xpath('//*[@id="info"]/span[@property="v:genre"]')]
+            # 制片国家/地区, 语言, 其他名称
+            temp_text = [temp.replace('\n', '').replace(' ', '') for temp in
+                         movie_tree.xpath('//*[@id="info"]/text()')]
+            while '' in temp_text:
+                temp_text.remove('')
+            while '/' in temp_text:
+                temp_text.remove('/')
+            # 电影制片国家/地区
+            countries = temp_text[0]
+            # 电影语言
+            language = temp_text[1]
+            # 电影其他名称
+            other_name = temp_text[2]
+            # 电影上映日期
+            release_date = movie_tree.xpath('//*[@id="info"]/span[10]')[0].text
+            # 电影片长
+            durations = movie_tree.xpath('//*[@id="info"]/span[12]')[0].text
+            # 电影简介
+            summary = movie_tree.xpath('//*[@id="link-report"]/span[1]')[0].text.replace(' ', '').replace('\u3000','').replace('\n', '')
+            # 电影平均评分
+            average = movie_tree.xpath('//*[@id="interest_sectl"]/div[1]/div[2]/strong')[0].text
+            # 电影总评价人数
+            reviews_count = movie_tree.xpath('//*[@id="interest_sectl"]/div[1]/div[2]/div/div[2]/a/span')[0].text
+            # 电影评分信息
+            rating = {
+                'average': average,
+                'reviews_count': reviews_count
+            }
 
-            # 写入到文件之中
-            movie_info_file_path = 'movie_info.txt'
-            with open(movie_info_file_path, 'a+') as f:
-                movie_info_str = json.loads(movie_info)
-                f.write(json.dumps(movie_info_str))
+            movie_info_json = {
+                'id': movie_id,
+                'name': name,
+                'director': directors,
+                'writers': writers,
+                'casts': casts,
+                'genres': genres,
+                'countries': countries,
+                'language': language,
+                'release_data': release_date,
+                'durations': durations,
+                'other_name': other_name,
+                'summary': summary,
+                'rating': rating
+            }
+            self.movie_spider_log.info('获取电影' + str(movie_id) + '信息成功')
+            self.movie_spider_log.info('电影' + str(movie_id) + '信息为' + str(movie_info_json))
+
+            # 将演员ID加入到待抓取队列
+            self._add_wait_actor(movie_info_json)
+
+            # 将演员信息写入到文件之中
+            self._save_movie_info(movie_info_json)
         except Exception as err:
-            self.movie_spider_log.info('获取' + str(movie_id) + '电影信息失败' + str(err))
+            self.movie_spider_log.info('获取电影' + str(movie_id) + '信息失败' + str(err))
+
+    def _get_actor_info(self, actor_id):
+        """
+        获取演员信息
+        :param actor_id:
+        :return:
+        """
+        try:
+            actor_url = 'https://movie.douban.com/celebrity/' + str(actor_id)
+            actor_info_html = requests.get(actor_url, headers=self.headers, proxies=self.proxies, timeout=self.timeout).text
+
+        except Exception as err:
+            self.movie_spider_log.error(str(err))
 
     def _get_all_movie_info(self):
         is_end = False
@@ -153,10 +276,21 @@ class DouBanMovieSpider:
                 break
 
             # 多线程获取电影Info
-            pool = ThreadPool(8)
-            pool.map(self._get_movie_info, movie_id_list)
-            pool.close()
-            pool.join()
+            movie_pool = ThreadPool(8)
+            movie_pool.map(self._get_movie_info, movie_id_list)
+            movie_pool.close()
+            movie_pool.join()
+
+            # 多线程获取电影演员信息
+            actor_id_list = []
+            while self.redis_con.llen('actor_queue'):
+                # 出队列获取演员ID
+                actor_id_list.append(str(self.redis_con.rpop('user_queue').decode('utf-8')))
+            actor_pool = ThreadPool(8)
+            actor_pool.map(self._get_actor_info, actor_id_list)
+            actor_pool.close()
+            actor_pool.join()
+
 
     def run(self):
         """

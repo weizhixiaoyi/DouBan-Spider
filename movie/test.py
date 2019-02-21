@@ -4,8 +4,8 @@ import json
 from bs4 import BeautifulSoup
 
 
-def parse():
-    movie_url = 'https://movie.douban.com/subject/26266893/'
+def parse_movie():
+    movie_url = 'https://movie.douban.com/subject/1438689/'
     movie_info_text = requests.get(movie_url).text
     movie_tree = etree.HTML(movie_info_text)
 
@@ -39,20 +39,34 @@ def parse():
         temp_text.remove('')
     while '/' in temp_text:
         temp_text.remove('/')
+    for text in temp_text:
+        if text[0] == '/':
+            temp_text.remove(text)
+
     # 电影制片国家/地区
     countries = temp_text[0]
     # 电影语言
     language = temp_text[1]
     # 电影其他名称
-    other_name = temp_text[2]
+    other_name = temp_text[-1]
     # 电影上映日期
     release_date = movie_tree.xpath('//*[@id="info"]/span[10]')[0].text
     # 电影片长
     durations = movie_tree.xpath('//*[@id="info"]/span[12]')[0].text
     # 电影简介
-    summary = movie_tree.xpath('//*[@id="link-report"]/span[1]')[0].text.replace(' ', '').replace('\u3000', '').replace(
+    print(movie_tree.xpath('//*[@id="link-report"]/span/text()'))
+    summary = movie_tree.xpath('//*[@id="link-report"]/span')[0].text.replace(' ', '').replace('\u3000', '').replace(
         '\n', '')
     # 电影评分
+    # 平均得分
+    average = movie_tree.xpath('//*[@id="interest_sectl"]/div[1]/div[2]/strong')[0].text
+    # 评价人数
+    reviews_count = movie_tree.xpath('//*[@id="interest_sectl"]/div[1]/div[2]/div/div[2]/a/span')[0].text
+    rating = {
+        'average': average,
+        'reviews_count': reviews_count
+    }
+
     movie_info_json = {
         'name': name,
         'director': directors,
@@ -64,33 +78,33 @@ def parse():
         'release_data': release_date,
         'durations': durations,
         'other_name': other_name,
-        'summary': summary
+        'summary': summary,
+        'rating': rating
     }
     print(movie_info_json)
+    movie_info_file_path = '../data/movie_info.txt'
+    with open(movie_info_file_path, 'w') as f:
+        f.write(json.dumps(movie_info_json, ensure_ascii=False))
 
+def parse_actor():
+    actor_url = 'https://movie.douban.com/celebrity/1276086/'
+    actor_info_html = requests.get(actor_url).text
+    actor_tree = etree.HTML(actor_info_html)
 
-def parse1():
-    movie_url = 'https://movie.douban.com/subject/26266893/'
-    movie_info_html = requests.get(movie_url).text
-    soup = BeautifulSoup(movie_info_html, 'html.parser')
+    # 获取演员信息
+    # 演员姓名
+    name = actor_tree.xpath('//*[@id="content"]/h1')[0].text
+    # 演员性别
+    gender = actor_tree.xpath('//*[@id="headline"]/div[2]/ul/li[1]')[0].text
 
-    # 电影名称
-    movie_name = soup.find('span', property="v:itemreviewed").text
-    # 电影信息
-    movie_info = soup.find_all('div', id='info')
-    # print(movie_info)
-    for tag in movie_info:
-        # 导演信息
-        directors_name = tag.find_all('span')[3].find_all['span']
-        print(directors_name)
+    actor_info_json = {
+        'name': name,
+        'gender': gender
+    }
+    print(actor_info_json)
 
-    # print(soup.find('div', id='info'))
-    # 导演信息
-    # directors = soup.find('span', class_='')
-
-    # print(movie_info_json)
 
 
 if __name__ == '__main__':
-    parse()
-    # parse1()
+    parse_movie()
+    # parse_actor()
