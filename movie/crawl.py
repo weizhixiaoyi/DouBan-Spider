@@ -5,6 +5,8 @@ import yaml
 import json
 import redis
 from multiprocessing.dummy import Pool as ThreadPool
+from movie_page_parse import MoviePageParse
+from person_page_parse import PersonPageParse
 from lxml import etree
 import threading
 import math
@@ -81,6 +83,9 @@ class DouBanMovieSpider:
             movie_info_file_path = '../data/movie_info.txt'
             if os.path.exists(movie_info_file_path):
                 os.remove(movie_info_file_path)
+            person_info_file_path = '../data/person_info.txt'
+            if os.path.exists(person_info_file_path):
+                os.remove(person_info_file_path)
             self.movie_spider_log.info('文件初始化成功')
         except Exception as err:
             self.movie_spider_log.info('文件初始化失败' + str(err))
@@ -168,22 +173,54 @@ class DouBanMovieSpider:
         :param movie_id:
         :return:
         """
+        self.movie_spider_log.info('开始获取电影' + str(movie_id) + '信息...')
+        try:
+            movie_url = 'https://movie.douban.com/subject/' + str(movie_id)
+            movie_info_html = requests.get(movie_url, headers=self.headers, proxies=self.proxies, timeout=self.timeout)
+            movie_page_parse = MoviePageParse(movie_id, movie_info_html)
+            movie_info_json = movie_page_parse.parse()
+            self.movie_spider_log.log('获取电影' + str(movie_id) + '信息成功')
 
-        pass
+            # 将演员ID加入到redis之中
+            self.movie_spider_log.info('添加演员信息到redis之中...')
+            key_value = ['directors', 'writers', 'actors']
+            for key in key_value:
+                for person in movie_info_json[key]:
+                    if person['href']:
+                        self._add_wait_actor(person['href'])
 
-    def _get_person_info(self, actor_id):
+            # 将电影信息保存到文件之中
+            self.movie_spider_log.info('保存电影' + str(movie_id) + '信息到文件之中...')
+            movie_info_file_path = '../data/movie_info.txt'
+            with open(movie_info_file_path, 'a+') as f:
+                f.write(json.dumps(movie_info_json) + '\n')
+
+        except Exception as err:
+            self.movie_spider_log.error('获取电影' + str(movie_id) + '信息失败' + str(err))
+
+    def _get_person_info(self, person_id):
         """
         获取演员信息
         :param actor_id:
         :return:
         """
+        self.movie_spider_log.info('开始获取演员' + str(person_id) + '信息...')
         try:
-            actor_url = 'https://movie.douban.com/celebrity/' + str(actor_id)
-            actor_info_html = requests.get(actor_url, headers=self.headers, proxies=self.proxies,
-                                           timeout=self.timeout).text
+            person_url = 'https://movie.douban.com' + str(person_id)
+            person_info_html = requests.get(person_url, headers=self.headers, proxies=self.proxies,
+                                            timeout=self.timeout).text
+            person_page_parse = PersonPageParse(person_id, person_info_html)
+            person_info_json = person_page_parse.parse()
+            self.movie_spider_log.info('获取演员' + str(person_id) + '信息成功')
+
+            # 将演员信息保存到文件之中
+            self.movie_spider_log.info('保存演员' + str(person_id) + '信息到文件之中')
+            person_info_file_path = '../data/person_info.txt'
+            with open(person_info_file_path, 'a+') as f:
+                f.write(json.dumps(person_info_json) + '\n')
 
         except Exception as err:
-            self.movie_spider_log.error(str(err))
+            self.movie_spider_log.error('获取演员' + str(person_id) + '信息失败')
 
     def _get_all_movie_info(self):
         is_end = False
@@ -203,12 +240,12 @@ class DouBanMovieSpider:
             movie_pool.join()
 
             # 多线程获取电影演员信息
-            actor_id_list = []
+            person_id_list = []
             while self.redis_con.llen('actor_queue'):
                 # 出队列获取演员ID
-                actor_id_list.append(str(self.redis_con.rpop('user_queue').decode('utf-8')))
+                person_id_list.append(str(self.redis_con.rpop('user_queue').decode('utf-8')))
             actor_pool = ThreadPool(8)
-            actor_pool.map(self._get_person_info, actor_id_list)
+            actor_pool.map(self._get_person_info, person_id_list)
             actor_pool.close()
             actor_pool.join()
 

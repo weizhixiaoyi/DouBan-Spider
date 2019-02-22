@@ -7,18 +7,23 @@ from bs4 import BeautifulSoup
 
 class MoviePageParse:
     def __init__(self, movie_id, movie_info_html):
+        """
+        初始化
+        :param movie_id:
+        :param movie_info_html:
+        """
         self.movie_id = movie_id
         self.movie_info_html = movie_info_html
-        self.filmsoup = BeautifulSoup(self.movie_info_html, 'lxml')
+        self.film_soup = BeautifulSoup(self.movie_info_html, 'lxml')
 
     def _get_movie_name(self):
         """
         获取电影姓名
-        :param filmsoup:
+        :param film_soup:
         :return:
         """
         try:
-            name = str(self.filmsoup.find('span', property='v:itemreviewed').text)
+            name = str(self.film_soup.find('span', property='v:itemreviewed').text)
         except Exception as err:
             name = ''
 
@@ -27,11 +32,11 @@ class MoviePageParse:
     def _get_movie_directors(self):
         """
         获取电影导演信息
-        :param filmsoup:
+        :param film_soup:
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
             directors = []
             directors_text = re.search(r'导演</span>: <span class="attrs">.*</span><br/>', film_info).group()
             directors_text = directors_text.replace('导演</span>: <span class="attrs">', '').replace('</span><br/>',
@@ -43,7 +48,9 @@ class MoviePageParse:
             for director in directors_text_list:
                 director_name = re.sub(r'<a.*>', '', director).replace('/', '').replace(' ', '')
                 if 'celebrity' in director:
-                    director_href = re.search(r'href="/celebrity/\d{0,15}/"', director).group().replace('href=','').replace('"', '')
+                    director_href = re.search(r'href="/celebrity/\d{0,15}/"', director).group().replace('href=',
+                                                                                                        '').replace('"',
+                                                                                                                    '')
                 else:
                     director_href = ''
                 directors.append({'name': director_name, 'href': director_href})
@@ -55,11 +62,11 @@ class MoviePageParse:
     def _get_movie_writers(self):
         """
         获取电影编剧信息
-        :param filmsoup:
+        :param film_soup:
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
             writers = []
             writers_text = re.search(r'编剧</span>: <span class="attrs">.*</span><br/>', film_info).group()
             writers_text = writers_text.replace('编剧</span>: <span class="attrs">', '').replace('</span><br/>',
@@ -71,7 +78,8 @@ class MoviePageParse:
             for writer in writers_text_list:
                 writer_name = re.sub(r'<a.*>', '', writer).replace('/', '').replace(' ', '')
                 if 'celebrity' in writer:
-                    writer_href = re.search(r'href="/celebrity/\d{0,15}/"', writer).group().replace('href=', '').replace('"', '')
+                    writer_href = re.search(r'href="/celebrity/\d{0,15}/"', writer).group().replace('href=',
+                                                                                                    '').replace('"', '')
                 else:
                     writer_href = ''
                 writers.append({'name': writer_name, 'href': writer_href})
@@ -86,7 +94,7 @@ class MoviePageParse:
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
             actors = []
             actors_text = re.search(r'主演</span>: <span class="attrs">.*</span><br/>', film_info).group()
             actors_text = actors_text.replace('主演</span>: <span class="attrs">', '').replace('</span><br/>',
@@ -98,7 +106,8 @@ class MoviePageParse:
             for actor in actors_text_list:
                 actor_name = re.sub(r'<a.*>', '', actor).replace('/', '').replace(' ', '')
                 if 'celebrity' in actor:
-                    actor_href = re.search(r'href="/celebrity/\d{0,15}/"', actor).group().replace('href=', '').replace('"', '')
+                    actor_href = re.search(r'href="/celebrity/\d{0,15}/"', actor).group().replace('href=', '').replace(
+                        '"', '')
                 else:
                     actor_href = ''
                 actors.append({'name': actor_name, 'href': actor_href})
@@ -112,7 +121,7 @@ class MoviePageParse:
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
             genres = []
             genres_text = re.search(r'类型:</span> .*<br/>', film_info).group()
             genres_text = genres_text.replace('类型:</span> ', '').replace('<br/>', '')
@@ -133,8 +142,10 @@ class MoviePageParse:
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
+            print(film_info)
             countries_text = re.search(r'制片国家/地区:</span>.*<br/>', film_info).group()
+            print(countries_text)
             countries_text = countries_text.replace('制片国家/地区:</span>', '').replace('<br/>', '')
             countries = [country.replace(' ', '') for country in countries_text.split('/')]
         except Exception as err:
@@ -148,7 +159,7 @@ class MoviePageParse:
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
             languages_text = re.search(r'语言:</span>.*<br/>', film_info).group()
             languages_text = languages_text.replace('语言:</span>', '').replace('<br/>', '')
             languages = [language.replace(' ', '') for language in languages_text.split('/')]
@@ -163,7 +174,7 @@ class MoviePageParse:
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
             pubdates = []
             try:
                 release_text = re.search(r'上映日期:</span> .*<br/>', film_info).group()
@@ -188,7 +199,7 @@ class MoviePageParse:
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
             episodes_text = re.search(r'集数:</span>.*<br/>', film_info).group()
             episodes_text = episodes_text.replace('集数:</span>', '').replace('<br/>', '').replace(' ', '')
             episodes = episodes_text
@@ -202,7 +213,7 @@ class MoviePageParse:
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
             durations = []
             durations_text = re.search(r'片长:</span> .*<br/>', film_info).group()
             durations_text = durations_text.replace('片长:</span> ', '').replace('<br/>', '')
@@ -217,26 +228,13 @@ class MoviePageParse:
 
         return durations
 
-    def _get_movie_website(self):
-        """
-        获得电影网址, 如果没有则默认为豆瓣地址
-        :return:
-        """
-        try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
-            pass
-        except Exception as err:
-            pass
-
-
-
     def _get_movie_other_names(self):
         """
         获取电影其他名称
         :return:
         """
         try:
-            film_info = str(self.filmsoup.find('div', {'id': 'info'}))
+            film_info = str(self.film_soup.find('div', {'id': 'info'}))
             other_names = []
             other_names_text = re.search('又名:</span>.*<br/>', film_info).group()
             other_names_text = other_names_text.replace('又名:</span>', '').replace('<br/>', '')
@@ -257,7 +255,7 @@ class MoviePageParse:
         :return:
         """
         try:
-            summary = str(self.filmsoup.find('span', property='v:summary').text)
+            summary = str(self.film_soup.find('span', property='v:summary').text)
             summary = summary.replace('\n', '').replace('\u3000', '').replace(' ', '')
         except Exception as err:
             summary = ''
@@ -269,8 +267,8 @@ class MoviePageParse:
         :return:
         """
         try:
-            average = str(self.filmsoup.find('strong', property='v:average').text)
-            reviews_count = str(self.filmsoup.find('span', property='v:votes').text)
+            average = str(self.film_soup.find('strong', property='v:average').text)
+            reviews_count = str(self.film_soup.find('span', property='v:votes').text)
             rating = {
                 'average': average,
                 'reviews_count': reviews_count
@@ -296,12 +294,11 @@ class MoviePageParse:
         countries = self._get_movie_countries()  # 电影制片国家/地区
         languages = self._get_movie_languages()  # 电影语言
         pubdates = self._get_movie_pubdates()  # 电影上映时间
-        episodes = self._get_movie_episodes() #电影集数
+        episodes = self._get_movie_episodes()  # 电影集数
         durations = self._get_movie_durations()  # 电影片长
-        website = self._get_movie_website() # 电影网址
         other_names = self._get_movie_other_names()  # 电影其他名称
         summary = self._get_movie_summary()  # 电影简介
-        rating = self._get_movie_rating() #电影评分
+        rating = self._get_movie_rating()  # 电影评分
 
         movie_info_json = {
             'id': self.movie_id,
