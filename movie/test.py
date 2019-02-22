@@ -115,11 +115,11 @@ def parse_actor():
 def parse_movie_1():
     movie_url = 'https://movie.douban.com/subject/25986662/'
     filmsoup = BeautifulSoup(requests.get(movie_url).text, 'lxml')
+    film_info = str(filmsoup.find('div', {'id': 'info'}))
 
     # 解析电影信息
     # 电影名称
-    name = filmsoup.find('span', property='v:itemreviewed').text
-    film_info = str(filmsoup.find('div', {'id': 'info'}))
+
     # try:
     #     print(re.search(r'导演</span>: <span class="attrs"><a href=".*?">(.*?)</a>', film_info).group())
     #     directors_name = re.search(r'导演</span>: <span class="attrs"><a href=".*?">(.*?)</a>', film_info).group(1)
@@ -128,7 +128,6 @@ def parse_movie_1():
     #     # print(directors_href)
     # except Exception as err:
     #     directors = ''
-
     try:
         print(re.search(r'编剧</span>: <span class="attrs"><a href=".*?">(.*?)</a>', film_info))
         screenwriter = re.search(r'编剧</span>: <span class="attrs"><a href=".*?">(.*?)</a>', film_info).group(1)
