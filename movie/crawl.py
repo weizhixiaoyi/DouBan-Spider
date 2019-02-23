@@ -101,7 +101,7 @@ class DouBanMovieSpider:
 
     def _set_random_sleep_time(self):
         # 爬虫间隔时间
-        self.sleep_time = random.randint(2, 4)
+        self.sleep_time = random.randint(1, 2)
 
     def _set_random_ua(self):
         ua_len = len(self.ua_list)
@@ -156,9 +156,10 @@ class DouBanMovieSpider:
         self.movie_spider_log.info('尝试获取' + str(start) + '页电影ID')
         # 获取电影ID
         try:
-            self._set_random_sleep_time()
             self._set_random_ua()
             self._set_random_ip()
+            # self._set_random_sleep_time()
+            # time.sleep(self.sleep_time)
             movie_id_api = 'https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags=&start=' + str(start)
             movie_id_text = requests.get(movie_id_api, headers=self.headers, proxies=self.proxies,
                                          timeout=self.timeout).text
@@ -214,10 +215,10 @@ class DouBanMovieSpider:
         """
         self.movie_spider_log.info('开始获取电影' + str(movie_id) + '信息...')
         try:
-            self._set_random_sleep_time()
             self._set_random_ua()
             self._set_random_ip()
-            time.sleep(self.sleep_time)
+            self._set_random_sleep_time()
+            # time.sleep(self.sleep_time)
             movie_url = 'https://movie.douban.com/subject/' + str(movie_id) + '/'
             movie_info_response = requests.get(movie_url, headers=self.headers, proxies=self.proxies,
                                            timeout=self.timeout)
@@ -256,10 +257,10 @@ class DouBanMovieSpider:
         """
         self.movie_spider_log.info('开始获取演员' + str(person_id) + '信息...')
         try:
-            self._set_random_sleep_time()
-            # self._set_random_ua()
+            self._set_random_ua()
             self._set_random_ip()
-            time.sleep(self.sleep_time)
+            self._set_random_sleep_time()
+            # time.sleep(self.sleep_time)
             person_url = 'https://movie.douban.com' + str(person_id)
             person_info_html = requests.get(person_url, headers=self.headers, proxies=self.proxies,
                                             timeout=self.timeout).text
@@ -297,17 +298,17 @@ class DouBanMovieSpider:
             movie_pool.join()
 
             # 多线程获取电影演员信息
-            # person_id_list = []
-            # while self.redis_con.llen('actor_queue'):
-            #     # 出队列获取演员ID
-            #     person_id_list.append(str(self.redis_con.rpop('actor_queue').decode('utf-8')))
-            # actor_pool = ThreadPool(12)
-            # actor_pool.map(self._get_person_info, person_id_list)
-            # actor_pool.close()
-            # actor_pool.join()
+            person_id_list = []
+            while self.redis_con.llen('actor_queue'):
+                # 出队列获取演员ID
+                person_id_list.append(str(self.redis_con.rpop('actor_queue').decode('utf-8')))
+            actor_pool = ThreadPool(12)
+            actor_pool.map(self._get_person_info, person_id_list)
+            actor_pool.close()
+            actor_pool.join()
 
             # 进行下一轮迭代
-            start += 1
+            start += 20
 
     def run(self):
         """
