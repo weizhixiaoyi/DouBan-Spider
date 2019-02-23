@@ -36,7 +36,7 @@ class PersonPageParse:
         :return:
         """
         try:
-            gender = 'None'
+            gender = ''
             person_info = BeautifulSoup(str(self.person_soup.find('div', {'class': 'info'})), 'lxml')
             person_info = person_info.find_all('li')
             for line in person_info:
@@ -45,8 +45,27 @@ class PersonPageParse:
                     gender_str = str(re.search(r'性别</span>:.*</li>', line).group())
                     gender = gender_str.replace('性别</span>:', '').replace('</li>', '')
         except Exception as err:
-            gender = 'None'
+            gender = ''
         return gender
+
+    def _get_person_birthday(self):
+        """
+        获取演员出生日期
+        :return:
+        """
+        try:
+            birtyday = ''
+            person_info = BeautifulSoup(str(self.person_soup.find('div', {'class': 'info'})), 'lxml')
+            person_info = person_info.find_all('li')
+            for line in person_info:
+                line = str(line).replace(' ', '').replace('\n', '')
+                if '出生日期' in line:
+                    birtyday_str = str(re.search(r'出生日期', ))
+                print(line)
+        except Exception as err:
+            birtyday = ''
+        return birtyday
+
 
     def parse(self):
         """
@@ -55,6 +74,7 @@ class PersonPageParse:
         """
         name = self._get_person_name()  # 演员姓名
         gender = self._get_person_gender()  # 演员性别
+        birthday = self._get_person_birthday() #演员出生日期
 
         person_info_json = {
             'name': name,
