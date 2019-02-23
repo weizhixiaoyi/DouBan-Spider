@@ -17,7 +17,7 @@ handlers:
     mode: 'w'
     formatter: simple
     level: INFO
-    filename: movie_spider.log
+    filename: '../log/movie_spider.log'
 loggers:
   spider:
     level: INFO

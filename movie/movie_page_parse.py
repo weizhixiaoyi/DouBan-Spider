@@ -29,6 +29,17 @@ class MoviePageParse:
 
         return name
 
+    def _get_movie_image_url(self):
+        """
+        获取电影图片链接
+        :return:
+        """
+        try:
+            image_url = str(self.film_soup.find('img', title='点击看更多海报')['src'])
+        except Exception as err:
+            image_url = ''
+        return image_url
+
     def _get_movie_directors(self):
         """
         获取电影导演信息
@@ -143,9 +154,7 @@ class MoviePageParse:
         """
         try:
             film_info = str(self.film_soup.find('div', {'id': 'info'}))
-            print(film_info)
             countries_text = re.search(r'制片国家/地区:</span>.*<br/>', film_info).group()
-            print(countries_text)
             countries_text = countries_text.replace('制片国家/地区:</span>', '').replace('<br/>', '')
             countries = [country.replace(' ', '') for country in countries_text.split('/')]
         except Exception as err:
@@ -255,8 +264,14 @@ class MoviePageParse:
         :return:
         """
         try:
-            summary = str(self.film_soup.find('span', property='v:summary').text)
-            summary = summary.replace('\n', '').replace('\u3000', '').replace(' ', '')
+            try:
+                # all content
+                summary = str(self.film_soup.find('span', class_='all hidden').text)
+                summary = summary.replace('\n', '').replace('\u3000', '').replace(' ', '')
+            except Exception as err:
+                # short content
+                summary = str(self.film_soup.find('span', property='v:summary').text)
+                summary = summary.replace('\n', '').replace('\u3000', '').replace(' ', '')
         except Exception as err:
             summary = ''
         return summary
@@ -287,6 +302,7 @@ class MoviePageParse:
         :return:
         """
         name = self._get_movie_name()  # 电影姓名
+        image_url = self._get_movie_image_url()  # 电影图片链接
         directors = self._get_movie_directors()  # 电影导演
         writers = self._get_movie_writers()  # 电影编剧
         actors = self._get_movie_actors()  # 电影演员
@@ -302,6 +318,7 @@ class MoviePageParse:
 
         movie_info_json = {
             'id': self.movie_id,
+            'image_url': image_url,
             'name': name,
             'directors': directors,
             'writers': writers,
@@ -320,7 +337,7 @@ class MoviePageParse:
 
 
 if __name__ == '__main__':
-    movie_id = 1428577
+    movie_id = 26425063
     movie_url = 'https://movie.douban.com/subject/' + str(movie_id)
     movie_info_html = requests.get(movie_url).text
     movie_page_parse = MoviePageParse(movie_id, movie_info_html)

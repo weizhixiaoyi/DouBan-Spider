@@ -3,5 +3,4 @@ redis:
   host: localhost
   port: 6379
 max_queue_len: 1000
-sleep_time : 2
 timeout: 20

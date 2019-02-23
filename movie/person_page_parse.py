@@ -30,6 +30,17 @@ class PersonPageParse:
             name = ''
         return name
 
+    def _get_person_image_url(self):
+        """
+        获取演员图片
+        :return:
+        """
+        try:
+            image_url = str(self.person_soup.find('img', title='点击看大图')['src'])
+        except Exception as err:
+            image_url = ''
+        return image_url
+
     def _get_person_gender(self):
         """
         获取演员性别
@@ -104,23 +115,41 @@ class PersonPageParse:
             profession = ''
         return profession
 
-    def _get_person_other_name(self):
+    def _get_person_other_chinese_name(self):
         """
-        获取演员其他名称
+        获取演员其他中文名称
         :return:
         """
         try:
-            other_name = ''
+            other_chinese_name = ''
             person_info = BeautifulSoup(str(self.person_soup.find('div', {'class': 'info'})), 'lxml')
             person_info = person_info.find_all('li')
             for line in person_info:
                 line = str(line).replace(' ', '').replace('\n', '')
-                if '更多' in line:
-                    other_name_str = str(re.search(r'更多.*名</span>:.*</li>', line).group())
-                    other_name = str(re.sub(r'更多.*名</span>', '',other_name_str)).replace('</li>', '')
+                if '更多中文名' in line:
+                    other_chinese_name_str = str(re.search(r'更多中文名</span>:.*</li>', line).group())
+                    other_chinese_name = other_chinese_name_str.replace('更多中文名</span>:', '').replace('</li>', '')
         except Exception as err:
-            other_name = ''
-        return other_name
+            other_chinese_name = ''
+        return other_chinese_name
+
+    def _get_person_other_english_name(self):
+        """
+        获取演员其他英文名称
+        :return:
+        """
+        try:
+            other_english_name = ''
+            person_info = BeautifulSoup(str(self.person_soup.find('div', {'class': 'info'})), 'lxml')
+            person_info = person_info.find_all('li')
+            for line in person_info:
+                line = str(line).replace(' ', '').replace('\n', '')
+                if '更多外文名' in line:
+                    other_english_name_str = str(re.search(r'更多外文名</span>:.*</li>', line).group())
+                    other_english_name = other_english_name_str.replace('更多外文名</span>:', '').replace('</li>', '')
+        except Exception as err:
+            other_english_name = ''
+        return other_english_name
 
     def _get_person_constellation(self):
         """
@@ -158,35 +187,65 @@ class PersonPageParse:
             family_member = ''
         return family_member
 
+    def _get_person_introduction(self):
+        """
+        获取演员介绍
+        :return:
+        """
+        try:
+            introduction = ''
+            try:
+                # all content
+                introduction = str(self.person_soup.find('span', class_='all hidden').text)
+                introduction = introduction.replace('\n', '').replace('\u3000', '').replace(' ', '')
+            except:
+                # short content
+                introduction = str(self.person_soup.find_all('div', id='intro')).replace('\n', '')
+                introduction = str(re.search('<div class="bd">.*</div>', introduction).group())
+                introduction = introduction.replace('<div class="bd">', '').replace('</div>', '').replace('\u3000',
+                                                                                                          '').replace(
+                    ' ', '')
+        except Exception as err:
+            introduction = ''
+        return introduction
+
     def parse(self):
         """
         获取演员信息
         :return:
         """
+        id = str(self.person_id)  # 演员id
         name = self._get_person_name()  # 演员姓名
+        image_url = self._get_person_image_url()  # 演员图片链接
+        constellation = self._get_person_constellation()  # 演员星座
         gender = self._get_person_gender()  # 演员性别
-        birthday = self._get_person_birthday() #演员出生日期
-        birthplace = self._get_person_birthplace() #演员出生地
-        profession = self._get_person_profession() #演员职业
-        other_name = self._get_person_other_name() #演员其他名称
-        constellation = self._get_person_constellation() #演员星座
-        family_member = self._get_person_family_member() #演员家庭成员
+        birthday = self._get_person_birthday()  # 演员出生日期
+        birthplace = self._get_person_birthplace()  # 演员出生地
+        profession = self._get_person_profession()  # 演员职业
+        other_chinese_name = self._get_person_other_chinese_name()  # 演员其他中文名称
+        other_english_name = self._get_person_other_english_name()  # 演员其他英文名称
+        family_member = self._get_person_family_member()  # 演员家庭成员
+        introduction = self._get_person_introduction()  # 获取演员介绍
 
         person_info_json = {
+            'id': id,
             'name': name,
+            'image_url': image_url,
             'constellation': constellation,
             'gender': gender,
             'birthday': birthday,
             'birthplace': birthplace,
             'profession': profession,
-            'other_name': other_name,
-            'family_member': family_member
+            'other_chinese_name': other_chinese_name,
+            'other_english_name': other_english_name,
+            'family_member': family_member,
+            'introduction': introduction
         }
-        print(person_info_json)
+        return person_info_json
 
 
 if __name__ == '__main__':
-    person_id = '/celebrity/1275307/'
+    person_id = '/celebrity/1054524/'
     person_url = 'https://movie.douban.com' + str(person_id)
     person_info_html = requests.get(person_url).text
     person_page_parse = PersonPageParse(person_id, person_info_html)
