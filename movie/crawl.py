@@ -67,7 +67,7 @@ class DouBanMovieSpider:
 
         # 初始化读取ua
         try:
-            ua_list_file_path = 'ua_list.txt'
+            ua_list_file_path = '../proxy/ua_list.txt'
             self.ua_list = []
             with open(ua_list_file_path, 'r') as f:
                 line = f.readline()
@@ -111,7 +111,7 @@ class DouBanMovieSpider:
 
     @staticmethod
     def _read_ip_list():
-        ip_list_file_path = 'ip_list.txt'
+        ip_list_file_path = '../proxy/ip_list.txt'
         ip_list = []
         with open(ip_list_file_path, 'r') as f:
             line = f.readline()
