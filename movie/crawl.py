@@ -7,9 +7,6 @@ import redis
 from multiprocessing.dummy import Pool as ThreadPool
 from movie_page_parse import MoviePageParse
 from person_page_parse import PersonPageParse
-from lxml import etree
-import threading
-import math
 import time
 import random
 import os
@@ -21,6 +18,8 @@ class DouBanMovieSpider:
         爬虫初始化
         :param token: init user
         """
+
+        # 请求头
         self.headers = {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -91,9 +90,7 @@ class DouBanMovieSpider:
 
         # ip代理
         self.proxies = {"http": "http://10.10.1.10:3128"}
-        # 最大待爬取列表数量
-        self.max_queue_len = self.config['max_queue_len']
-        # 请求时间
+        # 请求过期时间
         self.timeout = self.config['timeout']
         # 电影类型
         self.genres = self.config['genres']
@@ -101,10 +98,18 @@ class DouBanMovieSpider:
         self.movie_spider_log.info('DouBan-Movie-Spider初始化成功')
 
     def _set_random_sleep_time(self):
+        """
+        设置随机睡眠时间
+        :return:
+        """
         # 爬虫间隔时间
         self.sleep_time = random.randint(1, 2)
 
     def _set_random_ua(self):
+        """
+        设置随机ua
+        :return:
+        """
         ua_len = len(self.ua_list)
         rand = random.randint(0, ua_len - 1)
         self.headers['User-Agent'] = self.ua_list[rand]
@@ -112,6 +117,10 @@ class DouBanMovieSpider:
 
     @staticmethod
     def _read_ip_list():
+        """
+        读取ip文件
+        :return:
+        """
         ip_list_file_path = '../proxy/ip_list.txt'
         ip_list = []
         with open(ip_list_file_path, 'r') as f:
@@ -121,7 +130,22 @@ class DouBanMovieSpider:
                 line = f.readline()
         return ip_list
 
+    @staticmethod
+    def _set_random_test_url():
+        """
+        随机生成测试url
+        :return:
+        """
+        test_url_list = ['https://www.baidu.com/', 'https://www.sogou.com/', 'http://soso.com/', 'https://www.so.com/']
+        rand = random.randint(0, len(test_url_list) - 1)
+        rand_url = test_url_list[rand]
+        return rand_url
+
     def _set_random_ip(self):
+        """
+        设置随机ip, 并检查可用性
+        :return:
+        """
         ip_flag = False
         while not ip_flag:
             ip_list = self._read_ip_list()
@@ -134,9 +158,9 @@ class DouBanMovieSpider:
                 check_ip_proxies = {'http': rand_ip.strip('\n')}
             self.movie_spider_log.info('检查ip' + str(check_ip_proxies) + '可行性...')
             try:
-                check_ip_responce = requests.get('https://www.baidu.com/', proxies=check_ip_proxies,
-                                                 timeout=5)
-                check_ip_status = check_ip_responce.status_code
+                rand_url = self._set_random_test_url()
+                check_ip_response = requests.get(rand_url, proxies=check_ip_proxies, timeout=5)
+                check_ip_status = check_ip_response.status_code
                 if check_ip_status == 200:
                     self.proxies.clear()
                     self.proxies['https'] = rand_ip.strip('\n')
@@ -147,69 +171,6 @@ class DouBanMovieSpider:
                     self.movie_spider_log.info('当前ip' + str(check_ip_proxies) + '不可行, 尝试其他中...')
             except Exception as err:
                 self.movie_spider_log.error('当前ip' + str(check_ip_proxies) + '不可行, 尝试其他中...' + str(err))
-
-    def _get_movie_id(self, movie_type='', start=0):
-        """
-        根据api获取电影ID
-        :param start:
-        :return:
-        """
-        self.movie_spider_log.info('尝试获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID')
-        # 获取电影ID
-        try:
-            self._set_random_ua()
-            self._set_random_ip()
-            # self._set_random_sleep_time()
-            # time.sleep(self.sleep_time)
-            movie_id_api = 'https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags=&start=' + str(start) + '&genres=' + str(movie_type)
-            movie_id_text = requests.get(movie_id_api, headers=self.headers, proxies=self.proxies,
-                                         timeout=self.timeout).text
-            movie_id_json = json.loads(movie_id_text)
-            movie_id_data = movie_id_json['data']
-            if len(movie_id_data) == 0:
-                self.movie_spider_log.error('获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID失败, 长度为0')
-                return None
-            else:
-                movie_id_list = []
-                for movie in movie_id_data:
-                    if self._is_parse_movie_id(movie['id']):
-                        continue
-                    else:
-                        movie_id_list.append(movie['id'])
-                self.movie_spider_log.info('获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID成功, 长度为' + str(len(movie_id_list)))
-                return movie_id_list
-        except Exception as err:
-            self.movie_spider_log.info('获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID失败' + str(err))
-            return None
-
-    def _save_movie_info(self, movie_info_json):
-        """
-        保存电影信息到文件之中
-        :param movie_info_json:
-        :return:
-        """
-        movie_info_str = json.dumps(movie_info_json, ensure_ascii=False)
-        movie_info_file_path = '../data/movie_info.txt'
-        try:
-            with open(movie_info_file_path, 'a+') as f:
-                f.write(movie_info_str)
-            self.movie_spider_log.info('写入电影' + str(movie_info_json['id']) + '到文件成功')
-        except Exception as err:
-            self.movie_spider_log.error('写入电影' + str(movie_info_json['id']) + '到文件失败' + str(err))
-
-    def _add_wait_actor(self, person_href):
-        """
-        加入待抓取演员队列
-        :param user_token:
-        :return:
-        """
-        try:
-            if not self.redis_con.hexists('already_get_actor', person_href):
-                self.redis_con.hset('already_get_actor', person_href, 1)
-                self.redis_con.lpush('actor_queue', person_href)
-                self.movie_spider_log.info('添加演员' + str(person_href) + '到待爬取队列成功')
-        except Exception as err:
-            self.movie_spider_log.error('添加演员到待爬取队列失败' + str(err))
 
     def _is_parse_movie_id(self, movie_id):
         """
@@ -227,7 +188,57 @@ class DouBanMovieSpider:
         except Exception as err:
             return False
 
-    def _get_movie_info(self, movie_id):
+    def get_movie_id(self, movie_type='', start=0):
+        """
+        根据api获取电影ID
+        :param start:
+        :return:
+        """
+        self.movie_spider_log.info('尝试获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID')
+        # 获取电影ID
+        try:
+            self._set_random_ua()
+            self._set_random_ip()
+            # self._set_random_sleep_time()
+            # time.sleep(self.sleep_time)
+            movie_id_api = 'https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags=&start=' + str(
+                start) + '&genres=' + str(movie_type)
+            movie_id_text = requests.get(movie_id_api, headers=self.headers, proxies=self.proxies,
+                                         timeout=self.timeout).text
+            movie_id_json = json.loads(movie_id_text)
+            movie_id_data = movie_id_json['data']
+            if len(movie_id_data) == 0:
+                self.movie_spider_log.error('获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID失败, 长度为0')
+                return None
+            else:
+                movie_id_list = []
+                for movie in movie_id_data:
+                    if self._is_parse_movie_id(movie['id']):
+                        continue
+                    else:
+                        movie_id_list.append(movie['id'])
+                self.movie_spider_log.info(
+                    '获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID成功, 长度为' + str(len(movie_id_list)))
+                return movie_id_list
+        except Exception as err:
+            self.movie_spider_log.info('获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID失败' + str(err))
+            return None
+
+    def _add_wait_actor(self, person_href):
+        """
+        加入待抓取演员队列
+        :param user_token:
+        :return:
+        """
+        try:
+            if not self.redis_con.hexists('already_get_actor', person_href):
+                self.redis_con.hset('already_get_actor', person_href, 1)
+                self.redis_con.lpush('actor_queue', person_href)
+                self.movie_spider_log.info('添加演员' + str(person_href) + '到待爬取队列成功')
+        except Exception as err:
+            self.movie_spider_log.error('添加演员到待爬取队列失败' + str(err))
+
+    def get_movie_info(self, movie_id):
         """
         获取当前电影信息
         :param movie_id:
@@ -237,19 +248,16 @@ class DouBanMovieSpider:
         try:
             self._set_random_ua()
             self._set_random_ip()
-            self._set_random_sleep_time()
+            # self._set_random_sleep_time()
             # time.sleep(self.sleep_time)
             movie_url = 'https://movie.douban.com/subject/' + str(movie_id) + '/'
             movie_info_response = requests.get(movie_url, headers=self.headers, proxies=self.proxies,
-                                           timeout=self.timeout)
+                                               timeout=self.timeout)
             movie_info_html = movie_info_response.text
             movie_page_parse = MoviePageParse(movie_id, movie_info_html)
             movie_info_json = movie_page_parse.parse()
+            movie_info_json['id'] = str(movie_id)
             self.movie_spider_log.info('获取电影' + str(movie_id) + '信息成功')
-            # self.movie_spider_log.info('电影' + str(movie_id) + '状态码为' + str(movie_info_response.status_code))
-            # self.movie_spider_log.info(
-            #     '电影' + str(movie_id) + 'HTML为' + str(
-            #         movie_info_html.replace('\n', '').replace('\u3000', '').replace(' ', '').replace('\t', '')))
             self.movie_spider_log.info('电影' + str(movie_id) + '信息为' + str(movie_info_json))
 
             # 将演员ID加入到redis之中
@@ -269,7 +277,7 @@ class DouBanMovieSpider:
         except Exception as err:
             self.movie_spider_log.error('获取电影' + str(movie_id) + '信息失败' + str(err))
 
-    def _get_person_info(self, person_id):
+    def get_person_info(self, person_id):
         """
         获取演员信息
         :param actor_id:
@@ -299,24 +307,23 @@ class DouBanMovieSpider:
         except Exception as err:
             self.movie_spider_log.error('获取演员' + str(person_id) + '信息失败')
 
-    def _get_all_movie_info(self):
-
-        # 迭代爬取所有种类电影
+    def get_all_movie_info(self):
+        """
+        迭代爬取所有种类电影信息和演员信息
+        :return:
+        """
         for movie_type in self.genres:
             is_end = False
             start = 0
             while not is_end:
                 # 获取电影ID
-                movie_id_list = self._get_movie_id(movie_type, start)
-                if (not movie_id_list) and (start <= 9000):
-                    time.sleep(self.sleep_time)
-                    continue
-                elif not movie_id_list:
+                movie_id_list = self.get_movie_id(movie_type, start)
+                if not movie_id_list:
                     break
 
                 # 多线程获取电影Info
                 movie_pool = ThreadPool(12)
-                movie_pool.map(self._get_movie_info, movie_id_list)
+                movie_pool.map(self.get_movie_info, movie_id_list)
                 movie_pool.close()
                 movie_pool.join()
 
@@ -326,7 +333,7 @@ class DouBanMovieSpider:
                     # 出队列获取演员ID
                     person_id_list.append(str(self.redis_con.rpop('actor_queue').decode('utf-8')))
                 actor_pool = ThreadPool(12)
-                actor_pool.map(self._get_person_info, person_id_list)
+                actor_pool.map(self.get_person_info, person_id_list)
                 actor_pool.close()
                 actor_pool.join()
 
@@ -339,7 +346,7 @@ class DouBanMovieSpider:
         :return:
         """
         # 获取电影信息
-        self._get_all_movie_info()
+        self.get_all_movie_info()
 
 
 if __name__ == '__main__':
