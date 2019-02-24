@@ -81,7 +81,7 @@ class DouBanMovieSpider:
             movie_info_file_path = '../data/movie_info.txt'
             if os.path.exists(movie_info_file_path):
                 os.remove(movie_info_file_path)
-            person_info_file_path = '../data/person_info.txt'
+            person_info_file_path = '../data/movie_person_info.txt'
             if os.path.exists(person_info_file_path):
                 os.remove(person_info_file_path)
             self.movie_spider_log.info('文件初始化成功')
@@ -299,7 +299,7 @@ class DouBanMovieSpider:
 
             # 将演员信息保存到文件之中
             self.movie_spider_log.info('保存演员' + str(person_id) + '信息到文件之中')
-            person_info_file_path = '../data/person_info.txt'
+            person_info_file_path = '../data/movie_person_info.txt'
             with open(person_info_file_path, 'a+') as f:
                 f.write(json.dumps(person_info_json, ensure_ascii=False) + '\n')
             time.sleep(self.sleep_time)
