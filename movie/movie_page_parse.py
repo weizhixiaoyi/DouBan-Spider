@@ -288,7 +288,6 @@ class MoviePageParse:
                 'average': average,
                 'reviews_count': reviews_count
             }
-            pass
         except Exception as err:
             rating = {
                 'average': '',
@@ -315,6 +314,7 @@ class MoviePageParse:
         other_names = self._get_movie_other_names()  # 电影其他名称
         summary = self._get_movie_summary()  # 电影简介
         rating = self._get_movie_rating()  # 电影评分
+
 
         movie_info_json = {
             'id': self.movie_id,

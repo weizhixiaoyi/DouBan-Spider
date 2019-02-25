@@ -9,6 +9,7 @@ import json
 import redis
 from multiprocessing.dummy import Pool as ThreadPool
 from bs4 import BeautifulSoup
+from book_page_parse import BookPageParse
 import time
 import random
 import os
@@ -179,6 +180,10 @@ class DouBanBookSpider:
         """
         self.book_spider_log.info('尝试获取书籍标签信息中...')
         try:
+            self._set_random_ua()
+            self._set_random_ip()
+            # self._set_random_sleep_time()
+            # time.sleep(self.sleep_time)
             tags_url = 'https://book.douban.com/tag/?view=type'
             tags_response = requests.get(tags_url, headers=self.headers, proxies=self.proxies, timeout=self.timeout)
             tags_html = tags_response.text
@@ -208,6 +213,10 @@ class DouBanBookSpider:
         """
         self.book_spider_log.info('尝试获取' + str(book_tag) + 'tag, 第' + str(start) + '个书籍ID')
         try:
+            self._set_random_ua()
+            self._set_random_ip()
+            # self._set_random_sleep_time()
+            # time.sleep(self.sleep_time)
             book_tag_url = 'https://book.douban.com/tag/' + str(book_tag) + '?start=' + str(start) + '&type=T'
             book_tag_page_response = requests.get(book_tag_url, headers=self.headers, proxies=self.proxies,
                                                   timeout=self.timeout)
@@ -240,6 +249,32 @@ class DouBanBookSpider:
         :return:
         """
         self.book_spider_log.info('开始获取书籍' + str(book_id) + '信息...')
+        try:
+            self._set_random_ua()
+            self._set_random_ip()
+            self._set_random_sleep_time()
+            time.sleep(self.sleep_time)
+
+            book_info_url = 'https://book.douban.com/subject/' + str(book_id)
+            book_info_response = requests.get(book_info_url, headers=self.headers, proxies=self.proxies,
+                                              timeout=self.timeout)
+            book_info_html = book_info_response.text
+            book_page_parse = BookPageParse(book_id, book_info_html)
+            book_info_json = book_page_parse.parse()
+            self.book_spider_log.info('获取书籍' + str(book_id) + '信息成功')
+            self.book_spider_log.info('电影' + str(book_id) + '信息为' + str(book_info_json))
+
+            # 将作者ID加入到redis之中
+            self.book_spider_log.info('添加作者信息到redis之中...')
+
+
+            # 将电影信息保存到文件之中
+            self.book_spider_log.info('保存书籍' + str(book_id) + '信息到文件之中...')
+            book_info_file_path = '../data/book_info.txt'
+            with open(book_info_file_path, 'a+') as f:
+                f.write(json.dumps(book_info_json, ensure_ascii=False) + '\n')
+        except Exception as err:
+            self.book_spider_log.error('获取书籍' + str(book_id) + '信息失败' + str(err))
 
     def get_all_book_info(self):
         """

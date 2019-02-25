@@ -256,7 +256,6 @@ class DouBanMovieSpider:
             movie_info_html = movie_info_response.text
             movie_page_parse = MoviePageParse(movie_id, movie_info_html)
             movie_info_json = movie_page_parse.parse()
-            movie_info_json['id'] = str(movie_id)
             self.movie_spider_log.info('获取电影' + str(movie_id) + '信息成功')
             self.movie_spider_log.info('电影' + str(movie_id) + '信息为' + str(movie_info_json))
 
