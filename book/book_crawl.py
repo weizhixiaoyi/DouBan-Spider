@@ -205,6 +205,22 @@ class DouBanBookSpider:
         except Exception as err:
             self.book_spider_log.error('获取书籍标签信息失败' + str(err))
 
+    def _is_parse_book_id(self, book_id):
+        """
+        判断是否已经爬取过该id
+        :return:
+        """
+        try:
+            if self.redis_con.hexists('already_parse_book', book_id):
+                self.book_spider_log.info('已经解析过' + str(book_id) + '书籍')
+                return True
+            else:
+                self.redis_con.hset('already_parse_book', book_id, 1)
+                self.book_spider_log.info('没有解析过' + str(book_id) + '书籍, 等待解析')
+                return False
+        except Exception as err:
+            return False
+
     def get_book_id(self, book_tag='小说', start=0):
         """
         获取当前页面的书籍ID
@@ -212,7 +228,7 @@ class DouBanBookSpider:
         :param start:
         :return:
         """
-        self.book_spider_log.info('尝试获取' + str(book_tag) + 'tag, 第' + str(start) + '个书籍ID')
+        self.book_spider_log.info('尝试获取' + str(book_tag) + 'tag, 第' + str(start) + '个书籍ID...')
         try:
             self._set_random_ua()
             self._set_random_ip()
@@ -233,20 +249,21 @@ class DouBanBookSpider:
                     id_str_list = re.findall(r'subject_id:\'.*\',', str(book))
                     if id_str_list:
                         book_id = str(id_str_list[0]).replace('\'', '').replace('subject_id:', '').replace(',', '')
-                        book_id_list.append(book_id)
+                        if self._is_parse_book_id(book_id):
+                            continue
+                        else:
+                            book_id_list.append(book_id)
 
-                self.book_spider_log.info('尝试获取' + str(book_tag) + 'tag, 第' + str(start) + '个书籍ID成功')
-                if book_id_list:
-                    return book_id_list
-                else:
-                    return None
+                self.book_spider_log.info(
+                    '获取' + str(book_tag) + 'tag, 第' + str(start) + '个书籍ID成功, 长度为' + str(len(book_id_list)))
+                return book_id_list
         except Exception as err:
-            self.book_spider_log.info('尝试获取' + str(book_tag) + 'tag, 第' + str(start) + '个书籍ID失败' + str(err))
+            self.book_spider_log.info('获取' + str(book_tag) + 'tag, 第' + str(start) + '个书籍ID失败' + str(err))
             return None
 
     def _add_wait_author(self, person_href):
         """
-        加入待抓取演员队列
+        加入待抓取作者队列
         :param user_token:
         :return:
         """
@@ -267,8 +284,8 @@ class DouBanBookSpider:
         try:
             self._set_random_ua()
             self._set_random_ip()
-            self._set_random_sleep_time()
-            time.sleep(self.sleep_time)
+            # self._set_random_sleep_time()
+            # time.sleep(self.sleep_time)
 
             book_info_url = 'https://book.douban.com/subject/' + str(book_id)
             book_info_response = requests.get(book_info_url, headers=self.headers, proxies=self.proxies,
@@ -277,7 +294,7 @@ class DouBanBookSpider:
             book_page_parse = BookPageParse(book_id, book_info_html)
             book_info_json = book_page_parse.parse()
             self.book_spider_log.info('获取书籍' + str(book_id) + '信息成功')
-            self.book_spider_log.info('电影' + str(book_id) + '信息为' + str(book_info_json))
+            self.book_spider_log.info('书籍' + str(book_id) + '信息为' + str(book_info_json))
 
             # 将作者ID加入到redis之中
             self.book_spider_log.info('添加作者信息到redis之中...')
@@ -304,22 +321,23 @@ class DouBanBookSpider:
         try:
             self._set_random_ua()
             self._set_random_ip()
-            self._set_random_sleep_time()
+            # self._set_random_sleep_time()
             # time.sleep(self.sleep_time)
-            person_info_html = requests.get(person_id, headers=self.headers, proxies=self.proxies,
+            person_url = 'https://book.douban.com' + str(person_id)
+            person_info_html = requests.get(person_url, headers=self.headers, proxies=self.proxies,
                                             timeout=self.timeout).text
             person_page_parse = PersonPageParse(person_id, person_info_html)
             person_info_json = person_page_parse.parse()
             self.book_spider_log.info('获取作者' + str(person_id) + '信息成功')
             self.book_spider_log.info('作者' + str(person_id) + '信息为' + str(person_info_json))
 
-            # 将演员信息保存到文件之中
+            # 将作者信息保存到文件之中
             self.book_spider_log.info('保存作者' + str(person_id) + '信息到文件之中')
             person_info_file_path = '../data/book_person_info.txt'
             with open(person_info_file_path, 'a+') as f:
                 f.write(json.dumps(person_info_json, ensure_ascii=False) + '\n')
         except Exception as err:
-            self.book_spider_log.error('获取演员' + str(person_id) + '信息失败')
+            self.book_spider_log.error('获取作者' + str(person_id) + '信息失败')
 
     def get_all_book_info(self):
         """
@@ -335,17 +353,19 @@ class DouBanBookSpider:
                 # 获取书籍ID
                 book_id_list = self.get_book_id(tag, start)
                 if not book_id_list and start <= 9800:
-                    # 如果小于9000, 而且是空, 再尝试访问5次
+                    # 如果小于9800, 而且是空, 再尝试访问3次
                     for i in range(0, 3):
                         book_id_list = self.get_book_id(tag, start)
                         if book_id_list:
                             self.book_spider_log.info(
-                                '尝试获取' + str(tag) + 'type, 第' + str(start) + '个书籍ID失败, 重试第' + str(i) + '次数成功')
+                                '重新获取' + str(tag) + 'tag, 第' + str(start) + '个书籍ID失败, 重试第' + str(i) + '次数成功')
                             break
                         else:
                             self.book_spider_log.info(
-                                '尝试获取' + str(tag) + 'type, 第' + str(start) + '个书籍ID失败, 重试第' + str(i) + '次数失败')
+                                '重新获取' + str(tag) + 'tag, 第' + str(start) + '个书籍ID失败, 重试第' + str(i) + '次数失败')
                         time.sleep(10)
+                    if not book_id_list:
+                        break
                 elif not book_id_list:
                     break
 
@@ -355,10 +375,10 @@ class DouBanBookSpider:
                 movie_pool.close()
                 movie_pool.join()
 
-                # 多线程获取电影演员信息
+                # 多线程获取电影作者信息
                 person_id_list = []
                 while self.redis_con.llen('author_queue'):
-                    # 出队列获取演员ID
+                    # 出队列获取作者ID
                     person_id_list.append(str(self.redis_con.rpop('author_queue').decode('utf-8')))
                 author_poll = ThreadPool(12)
                 author_poll.map(self.get_person_info, person_id_list)

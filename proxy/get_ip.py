@@ -28,4 +28,4 @@ def get_ip():
 if __name__ == '__main__':
     while True:
         get_ip()
-        time.sleep(60 * 3)
+        time.sleep(60 * 2)

@@ -269,8 +269,7 @@ class BookPageParse:
             'catalog': catalog,
             'rating': rating
         }
-
-        print(book_info_json)
+        return book_info_json
 
 
 if __name__ == '__main__':

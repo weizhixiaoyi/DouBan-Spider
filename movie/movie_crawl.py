@@ -301,8 +301,7 @@ class DouBanMovieSpider:
             person_info_file_path = '../data/movie_person_info.txt'
             with open(person_info_file_path, 'a+') as f:
                 f.write(json.dumps(person_info_json, ensure_ascii=False) + '\n')
-            time.sleep(self.sleep_time)
-
+            # time.sleep(self.sleep_time)
         except Exception as err:
             self.movie_spider_log.error('获取演员' + str(person_id) + '信息失败')
 
@@ -318,8 +317,8 @@ class DouBanMovieSpider:
                 # 获取电影ID
                 movie_id_list = self.get_movie_id(movie_type, start)
                 if not movie_id_list and start <= 9000:
-                    # 如果小于9000, 而且是空, 再尝试访问5次
-                    for i in range(0, 5):
+                    # 如果小于9000, 而且是空, 再尝试访问3次
+                    for i in range(0, 3):
                         movie_id_list = self.get_movie_id(movie_type, start)
                         if movie_id_list:
                             self.movie_spider_log.info(
@@ -328,7 +327,9 @@ class DouBanMovieSpider:
                         else:
                             self.movie_spider_log.info(
                                 '尝试获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID失败, 重试第' + str(i) + '次数失败')
-                        time.sleep(15)
+                        time.sleep(10)
+                    if not movie_id_list:
+                        break
                 elif not movie_id_list:
                     break
 
