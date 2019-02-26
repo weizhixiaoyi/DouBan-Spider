@@ -4,7 +4,7 @@ import json
 
 
 def get_ip():
-    targetUrl = "http://piping.mogumiao.com/proxy/api/get_ip_bs?appKey=1efe29ec4b6943f0af3e59c3e29a165b&count=8&expiryDate=0&format=1&newLine=2"
+    targetUrl = "http://piping.mogumiao.com/proxy/api/get_ip_bs?appKey=c03bc78309b94c0c82154f88638d4bc6&count=10&expiryDate=0&format=1&newLine=2"
     response = requests.get(targetUrl)
     response_text = response.text
     response_json = json.loads(response_text)

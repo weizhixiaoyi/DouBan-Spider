@@ -10,6 +10,7 @@ import redis
 from multiprocessing.dummy import Pool as ThreadPool
 from bs4 import BeautifulSoup
 from book_page_parse import BookPageParse
+from book_person_page_parse import PersonPageParse
 import time
 import random
 import os
@@ -243,6 +244,20 @@ class DouBanBookSpider:
             self.book_spider_log.info('尝试获取' + str(book_tag) + 'tag, 第' + str(start) + '个书籍ID失败' + str(err))
             return None
 
+    def _add_wait_author(self, person_href):
+        """
+        加入待抓取演员队列
+        :param user_token:
+        :return:
+        """
+        try:
+            if not self.redis_con.hexists('already_get_author', person_href):
+                self.redis_con.hset('already_get_author', person_href, 1)
+                self.redis_con.lpush('author_queue', person_href)
+                self.book_spider_log.info('添加作者' + str(person_href) + '到待爬取队列成功')
+        except Exception as err:
+            self.book_spider_log.error('添加作者到待爬取队列失败' + str(err))
+
     def get_book_info(self, book_id):
         """
         获取当前书籍信息
@@ -266,7 +281,11 @@ class DouBanBookSpider:
 
             # 将作者ID加入到redis之中
             self.book_spider_log.info('添加作者信息到redis之中...')
-
+            key_value = ['author', 'translator']
+            for key in key_value:
+                for person in book_info_json[key]:
+                    if person['href']:
+                        self._add_wait_author(person['href'])
 
             # 将电影信息保存到文件之中
             self.book_spider_log.info('保存书籍' + str(book_id) + '信息到文件之中...')
@@ -275,6 +294,32 @@ class DouBanBookSpider:
                 f.write(json.dumps(book_info_json, ensure_ascii=False) + '\n')
         except Exception as err:
             self.book_spider_log.error('获取书籍' + str(book_id) + '信息失败' + str(err))
+
+    def get_person_info(self, person_id):
+        """
+        得到作者信息
+        :return:
+        """
+        self.book_spider_log.info('开始获取作者' + str(person_id) + '信息...')
+        try:
+            self._set_random_ua()
+            self._set_random_ip()
+            self._set_random_sleep_time()
+            # time.sleep(self.sleep_time)
+            person_info_html = requests.get(person_id, headers=self.headers, proxies=self.proxies,
+                                            timeout=self.timeout).text
+            person_page_parse = PersonPageParse(person_id, person_info_html)
+            person_info_json = person_page_parse.parse()
+            self.book_spider_log.info('获取作者' + str(person_id) + '信息成功')
+            self.book_spider_log.info('作者' + str(person_id) + '信息为' + str(person_info_json))
+
+            # 将演员信息保存到文件之中
+            self.book_spider_log.info('保存作者' + str(person_id) + '信息到文件之中')
+            person_info_file_path = '../data/book_person_info.txt'
+            with open(person_info_file_path, 'a+') as f:
+                f.write(json.dumps(person_info_json, ensure_ascii=False) + '\n')
+        except Exception as err:
+            self.book_spider_log.error('获取演员' + str(person_id) + '信息失败')
 
     def get_all_book_info(self):
         """
@@ -289,8 +334,19 @@ class DouBanBookSpider:
             while not is_end:
                 # 获取书籍ID
                 book_id_list = self.get_book_id(tag, start)
-                print(book_id_list)
-                if not book_id_list:
+                if not book_id_list and start <= 9800:
+                    # 如果小于9000, 而且是空, 再尝试访问5次
+                    for i in range(0, 3):
+                        book_id_list = self.get_book_id(tag, start)
+                        if book_id_list:
+                            self.book_spider_log.info(
+                                '尝试获取' + str(tag) + 'type, 第' + str(start) + '个书籍ID失败, 重试第' + str(i) + '次数成功')
+                            break
+                        else:
+                            self.book_spider_log.info(
+                                '尝试获取' + str(tag) + 'type, 第' + str(start) + '个书籍ID失败, 重试第' + str(i) + '次数失败')
+                        time.sleep(10)
+                elif not book_id_list:
                     break
 
                 # 多线程获取书籍Info
@@ -300,14 +356,14 @@ class DouBanBookSpider:
                 movie_pool.join()
 
                 # 多线程获取电影演员信息
-                # person_id_list = []
-                # while self.redis_con.llen('actor_queue'):
-                #     # 出队列获取演员ID
-                #     person_id_list.append(str(self.redis_con.rpop('actor_queue').decode('utf-8')))
-                # actor_pool = ThreadPool(12)
-                # actor_pool.map(self.get_person_info, person_id_list)
-                # actor_pool.close()
-                # actor_pool.join()
+                person_id_list = []
+                while self.redis_con.llen('author_queue'):
+                    # 出队列获取演员ID
+                    person_id_list.append(str(self.redis_con.rpop('author_queue').decode('utf-8')))
+                author_poll = ThreadPool(12)
+                author_poll.map(self.get_person_info, person_id_list)
+                author_poll.close()
+                author_poll.join()
 
                 # 进行下一轮迭代
                 start += 20

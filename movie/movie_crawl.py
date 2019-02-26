@@ -6,7 +6,7 @@ import json
 import redis
 from multiprocessing.dummy import Pool as ThreadPool
 from movie_page_parse import MoviePageParse
-from person_page_parse import PersonPageParse
+from movie_person_page_parse import PersonPageParse
 import time
 import random
 import os
@@ -317,7 +317,19 @@ class DouBanMovieSpider:
             while not is_end:
                 # 获取电影ID
                 movie_id_list = self.get_movie_id(movie_type, start)
-                if not movie_id_list:
+                if not movie_id_list and start <= 9000:
+                    # 如果小于9000, 而且是空, 再尝试访问5次
+                    for i in range(0, 5):
+                        movie_id_list = self.get_movie_id(movie_type, start)
+                        if movie_id_list:
+                            self.movie_spider_log.info(
+                                '尝试获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID失败, 重试第' + str(i) + '次数成功')
+                            break
+                        else:
+                            self.movie_spider_log.info(
+                                '尝试获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID失败, 重试第' + str(i) + '次数失败')
+                        time.sleep(15)
+                elif not movie_id_list:
                     break
 
                 # 多线程获取电影Info
