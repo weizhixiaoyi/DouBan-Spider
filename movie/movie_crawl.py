@@ -44,7 +44,7 @@ class DouBanMovieSpider:
 
         # 初始化配置
         try:
-            spider_cofig_file_path = 'movie_spider_config.yaml'
+            spider_cofig_file_path = '../movie/movie_spider_config.yaml'
             with open(spider_cofig_file_path, 'r') as f:
                 spider_config = yaml.load(f)
                 self.config = spider_config
@@ -316,7 +316,7 @@ class DouBanMovieSpider:
             while not is_end:
                 # 获取电影ID
                 movie_id_list = self.get_movie_id(movie_type, start)
-                if not movie_id_list and start <= 9000:
+                if not movie_id_list and start < 10000:
                     # 如果小于9000, 而且是空, 再尝试访问3次
                     for i in range(0, 3):
                         movie_id_list = self.get_movie_id(movie_type, start)
@@ -329,7 +329,8 @@ class DouBanMovieSpider:
                                 '尝试获取' + str(movie_type) + 'type, 第' + str(start) + '个电影ID失败, 重试第' + str(i) + '次数失败')
                         time.sleep(10)
                     if not movie_id_list:
-                        break
+                        start += 20
+                        continue
                 elif not movie_id_list:
                     break
 
